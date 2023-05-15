@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import socket
 import os
 HOST = "localhost"  # Nombre del host o direccion ip
