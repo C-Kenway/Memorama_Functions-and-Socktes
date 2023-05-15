@@ -1,11 +1,11 @@
 import socket
 import random
-import time
+import threading
 
 HOST = "localhost"
 PORT = 12345
 buffer_size = 1024
-
+numConn = 4
 def start_game(client_socket, difficulty):
     if difficulty == "1":
         words = ['gato', 'perro', 'oso', 'conejo']
@@ -29,7 +29,6 @@ def play_game(client_socket, board, flipped, board_size):
     attempts = 0
     last_choice = None
     while True:
-        print("Escucho peticion del cliente")
         choice = int(client_socket.recv(buffer_size).decode().strip())
         if choice < 0 or choice >= board_size:
             client_socket.send(str('Intente de nuevo.').encode())
@@ -65,15 +64,7 @@ def play_game(client_socket, board, flipped, board_size):
                 last_choice = choice
                 carta_previa = carta
 
-
-
-def run_server():
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.bind((HOST, PORT))
-    server_socket.listen(1)
-    print(f"El servidor está escuchando en {HOST}:{PORT}")
-    client_socket, client_address = server_socket.accept()
-    print(f"Se ha establecido una conexión desde {client_address[0]}:{client_address[1]}")
+def run_game(client_socket):
     client_socket.send(str("Dificultad: 1)Principiante 2)Avanzado \n Ingrese numero:").encode())
     difficulty = client_socket.recv(buffer_size).decode().strip()
     game = start_game(client_socket, difficulty)
@@ -88,5 +79,44 @@ def run_server():
     # Cerrar la conexión con el cliente
     client_socket.close()
 
-if __name__ == "__main__":
-    run_server()
+def servirPorSiempre(socketTcp, listaconexiones):
+    try:
+        while True:
+            client_conn, client_addr = socketTcp.accept()
+            print(f"Se ha establecido una conexión desde {client_addr[0]}:{client_addr[1]}")
+            listaconexiones.append(client_conn)
+            thread_read = threading.Thread(target=recibir_datos, args=[client_conn, client_addr])
+            thread_read.start()
+            gestion_conexiones(listaConexiones)
+    except Exception as e:
+        print("error en servir")
+        print(e)
+
+def gestion_conexiones(listaconexiones):
+    for conn in listaconexiones:
+        if conn.fileno() == -1:
+            listaconexiones.remove(conn)
+    print("hilos activos:", threading.active_count())
+    print("enum", threading.enumerate())
+    print("conexiones: ", len(listaconexiones))
+    print(listaconexiones)
+
+def recibir_datos(conn, addr):
+    cur_thread = threading.current_thread()
+    print("Recibiendo datos del cliente {} en el {}".format(addr, cur_thread.name))
+    try:
+        run_game(conn)
+    except Exception as e:
+        print("error en recibir")
+        print(e)
+    finally:
+        conn.close()
+
+listaConexiones = []
+with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as TCPServerSocket:
+    TCPServerSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    TCPServerSocket.bind((HOST, PORT))
+    TCPServerSocket.listen(int(numConn))
+    print("El servidor TCP está disponible y en espera de solicitudes")
+
+    servirPorSiempre(TCPServerSocket, listaConexiones)
